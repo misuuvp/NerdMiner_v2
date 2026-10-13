@@ -89,14 +89,6 @@ Successful compile tests have also been completed for:
 
 These boards have not yet been tested on real hardware with this fork.
 
-Successful compile tests have also been completed for:
-
-- ESP32 DevKit v1
-- ESP32-S2 Mini Wemos
-- ESP32-S3 DevKit v1
-
-These boards have not yet been tested on real hardware with this fork.
-
 Testing and feedback from:
 
 - ESP32
@@ -203,14 +195,6 @@ A cél az eredeti NerdMiner v2 által támogatott ESP32 boardok kompatibilitás�
 Jelenleg azonban:
 
 **a módosított firmware valós hardveres tesztje csak ESP32-C3 SuperMini-n történt meg.**
-
-Sikeres fordítási teszt történt továbbá az alábbi targetekre:
-
-- ESP32 DevKit v1
-- ESP32-S2 Mini Wemos
-- ESP32-S3 DevKit v1
-
-Ezeken a boardokon a fork még nem volt valós hardveren tesztelve.
 
 Sikeres fordítási teszt történt továbbá az alábbi targetekre:
 
