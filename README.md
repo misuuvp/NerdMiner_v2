@@ -1,3 +1,250 @@
+# NerdMiner v2 Web Manager & ESP32 Optimization Fork
+
+An enhanced fork of **NerdMiner v2** focused on the **ESP32-C3 SuperMini**, browser-based configuration, Wi-Fi management and SHA256 mining performance.
+
+This fork adds an integrated **ESP32 Web Manager**, BSSID/AP control, improved Wi-Fi fallback, browser-based pool configuration and mining optimizations.
+
+> **Hardware testing status:** At the moment, real-world testing has only been completed on the **ESP32-C3 SuperMini**.  
+> Builds for other ESP32 / ESP32-S2 / ESP32-S3 boards are being tested for compatibility, but they have not yet received the same level of real-world hardware testing.
+>
+> Feedback, bug reports and compatibility results from other boards are very welcome. If something needs fixing or improving, please open an issue.
+
+## ESP32-C3 SuperMini SHA256 optimization
+
+The ESP32-C3 SHA256 mining path was optimized to reduce unnecessary work in the hardware SHA loop.
+
+Real-world test results on an **ESP32-C3 SuperMini at the standard 160 MHz CPU frequency**:
+
+| Version | Hashrate |
+|---|---:|
+| Original / baseline | ~259.6 kH/s |
+| Optimized | ~308.3 kH/s |
+| Improvement | **~18.8%** |
+
+No CPU overclocking was used for these measurements.
+
+The optimized firmware has been tested with accepted shares and without rejects caused by the optimization.
+
+These results were measured on the tested ESP32-C3 SuperMini and should not be assumed to be identical on every ESP32 board.
+
+### Planned: overclocked version
+
+A separate **overclocked ESP32-C3 SuperMini version is planned** for users who want to experiment with higher performance.
+
+The current main version intentionally remains at the standard **160 MHz** CPU frequency.
+
+The future overclocked build will be kept separate so users can choose between standard-frequency stability and experimental higher performance.
+
+## Integrated ESP32 Web Manager
+
+This fork adds a lightweight browser-based Web Manager directly to NerdMiner.
+
+Features include:
+
+- Real-time hashrate monitoring
+- Current, 10-second and 60-second hashrate
+- Accepted and rejected share statistics
+- Best difficulty and template statistics
+- Pool connection information
+- Wi-Fi signal strength
+- ESP32 chip model and system information
+- Pool host, port, wallet/worker and password configuration
+- Wi-Fi network scanning
+- BSSID / access-point selection
+- Optional BSSID locking
+- Automatic fallback to another AP using the same SSID
+- Browser-based device restart
+- Wi-Fi reset without deleting mining pool settings
+- Dynamic HMPool support integration for BTC, BCH, DigiByte and eCash
+- Improved first-time configuration experience
+- Mobile-friendly Web Manager interface
+
+The Web Manager is especially useful for **headless ESP32-C3 SuperMini NerdMiner devices**, where configuration and monitoring would otherwise require serial access.
+
+## Improved Wi-Fi and BSSID handling
+
+For networks with multiple access points using the same SSID, the firmware can:
+
+- select a specific BSSID,
+- lock the miner to a selected access point,
+- remember the selected Wi-Fi channel,
+- fall back to another AP using the same SSID,
+- recover through WiFiManager configuration mode when needed.
+
+This can be useful with mesh Wi-Fi systems, repeaters and homes with multiple access points.
+
+## Compatibility
+
+The project is intended to remain compatible with the wider NerdMiner v2 ESP32 board ecosystem.
+
+However:
+
+**Real-world hardware testing of these modifications has currently only been completed on the ESP32-C3 SuperMini.**
+
+Successful compile tests have also been completed for:
+
+- ESP32 DevKit v1
+- ESP32-S2 Mini Wemos
+- ESP32-S3 DevKit v1
+
+These boards have not yet been tested on real hardware with this fork.
+
+Successful compile tests have also been completed for:
+
+- ESP32 DevKit v1
+- ESP32-S2 Mini Wemos
+- ESP32-S3 DevKit v1
+
+These boards have not yet been tested on real hardware with this fork.
+
+Testing and feedback from:
+
+- ESP32
+- ESP32-S2
+- ESP32-S3
+- other ESP32-C3 boards
+
+is very welcome.
+
+If you test this fork on another board, please report whether the Web Manager, Wi-Fi features and mining functions work correctly.
+
+## Support development
+
+If the Web Manager or ESP32 optimizations are useful to you, you can optionally support further development.
+
+**Bitcoin donation address:**
+
+`bc1qeedpdfke2gzexpnal54wcsewjvr65d8v0lfgfg`
+
+Donations are completely optional.
+
+---
+
+# Magyar leírás
+
+Ez a **NerdMiner v2** egy módosított változata, amely elsősorban az **ESP32-C3 SuperMini** használhatóságára, webes kezelésére, Wi-Fi kezelésére és SHA256 bányászati teljesítményére koncentrál.
+
+A fork egy beépített **ESP32 Web Managert**, BSSID/AP kezelést, jobb Wi-Fi fallback működést, böngészőből módosítható pool beállításokat és bányászati optimalizálásokat tartalmaz.
+
+> **Hardveres teszt állapota:** jelenleg a módosításokat élesben kizárólag **ESP32-C3 SuperMini** hardveren teszteltem.
+>
+> Más ESP32 / ESP32-S2 / ESP32-S3 boardokra a kompatibilitási fordítások készülnek, de ezeken még nem történt ugyanolyan szintű valós hardveres teszt.
+>
+> Szívesen várok visszajelzéseket, hibajelentéseket és más boardokon végzett teszteredményeket. Ha valamit javítani vagy módosítani kell, nyiss egy Issue-t.
+
+## ESP32-C3 SuperMini SHA256 optimalizálás
+
+Az ESP32-C3 hardveres SHA256 bányászati ciklusát optimalizáltam, több felesleges művelet eltávolításával.
+
+Valós mérési eredmény **ESP32-C3 SuperMini-n, gyári 160 MHz CPU órajelen**:
+
+| Verzió | Hashrate |
+|---|---:|
+| Eredeti / baseline | ~259.6 kH/s |
+| Optimalizált | ~308.3 kH/s |
+| Javulás | **~18.8%** |
+
+A mérés során **nem használtam processzor-túlhajtást**.
+
+Az optimalizált firmware accepted share-ekkel működött, és az optimalizálás miatt nem jelentkezett rejected share.
+
+A fenti eredmények az általam tesztelt ESP32-C3 SuperMini mérési eredményei, ezért más ESP32 boardon nem garantált pontosan ugyanez a teljesítménynövekedés.
+
+### Tervben: overclocked változat
+
+Tervben van egy külön **overclocked ESP32-C3 SuperMini firmware** azoknak, akik nagyobb teljesítménnyel szeretnének kísérletezni.
+
+A jelenlegi fő változat továbbra is a gyári **160 MHz-es** CPU órajelet használja.
+
+Az overclocked változat külön buildként készülne, így a felhasználó választhat majd a normál órajeles stabil változat és a kísérleti nagyobb teljesítmény között.
+
+## Beépített ESP32 Web Manager
+
+A fork egyik legfontosabb kiegészítése a közvetlenül a NerdMiner firmware-ben működő Web Manager.
+
+Főbb funkciók:
+
+- valós idejű hashrate kijelzés,
+- pillanatnyi, 10 másodperces és 60 másodperces átlag,
+- accepted és rejected share statisztika,
+- best difficulty és template statisztika,
+- pool kapcsolat információ,
+- Wi-Fi jelerősség,
+- ESP32 chip- és rendszerinformáció,
+- pool host, port, wallet/worker és password módosítása,
+- Wi-Fi hálózatok keresése,
+- BSSID / AP kiválasztás,
+- opcionális BSSID lock,
+- automatikus fallback azonos SSID-jű másik AP-ra,
+- újraindítás böngészőből,
+- Wi-Fi reset a pool beállítások törlése nélkül,
+- BTC/BCH/DGB/XEC HMPool támogatás,
+- egyszerűbb első konfiguráció,
+- mobilbarát kezelőfelület.
+
+Különösen hasznos kijelző nélküli, például **ESP32-C3 SuperMini alapú NerdMiner** esetén.
+
+## Továbbfejlesztett Wi-Fi / BSSID kezelés
+
+Ha ugyanazon SSID alatt több hozzáférési pont működik, a miner képes:
+
+- konkrét BSSID kiválasztására,
+- adott AP-hoz rögzítésre,
+- a kiválasztott Wi-Fi csatorna eltárolására,
+- azonos SSID-jű másik AP-ra történő fallbackre,
+- szükség esetén WiFiManager AP módon keresztüli helyreállításra.
+
+Ez különösen hasznos mesh hálózat, repeater vagy több Wi-Fi AP használata esetén.
+
+## Kompatibilitás és visszajelzés
+
+A cél az eredeti NerdMiner v2 által támogatott ESP32 boardok kompatibilitásának megtartása.
+
+Jelenleg azonban:
+
+**a módosított firmware valós hardveres tesztje csak ESP32-C3 SuperMini-n történt meg.**
+
+Sikeres fordítási teszt történt továbbá az alábbi targetekre:
+
+- ESP32 DevKit v1
+- ESP32-S2 Mini Wemos
+- ESP32-S3 DevKit v1
+
+Ezeken a boardokon a fork még nem volt valós hardveren tesztelve.
+
+Sikeres fordítási teszt történt továbbá az alábbi targetekre:
+
+- ESP32 DevKit v1
+- ESP32-S2 Mini Wemos
+- ESP32-S3 DevKit v1
+
+Ezeken a boardokon a fork még nem volt valós hardveren tesztelve.
+
+Különösen várom az:
+
+- ESP32,
+- ESP32-S2,
+- ESP32-S3,
+- más ESP32-C3
+
+eszközökön végzett tesztek eredményeit.
+
+Ha valamelyik boardon hibát találsz, vagy valamin javítani kell, kérlek jelezd GitHub Issue-ban.
+
+## Fejlesztés támogatása
+
+Ha hasznosnak találod a Web Managert vagy az ESP32 optimalizálásokat, opcionálisan támogathatod a további fejlesztést.
+
+**Bitcoin adománycím:**
+
+`bc1qeedpdfke2gzexpnal54wcsewjvr65d8v0lfgfg`
+
+A támogatás természetesen nem kötelező.
+
+---
+
+# Original NerdMiner v2 README
+
 # NerdSoloMiner
 
 **The NerdSoloMiner v2**
