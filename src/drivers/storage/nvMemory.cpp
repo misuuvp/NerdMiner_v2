@@ -28,7 +28,11 @@ bool nvMemory::saveConfig(TSettings* Settings)
         Serial.println(F("SPIFS: Saving configuration."));
 
         // Create a JSON document
-        StaticJsonDocument<512> json;
+        StaticJsonDocument<768> json;
+        json[JSON_SPIFFS_KEY_WIFI_BSSID_LOCK] = Settings->WifiBSSIDLock;
+        json[JSON_SPIFFS_KEY_WIFI_BSSID] = Settings->WifiBSSID;
+        json[JSON_SPIFFS_KEY_WIFI_CHANNEL] = Settings->WifiChannel;
+        json[JSON_SPIFFS_KEY_WIFI_FALLBACK] = Settings->WifiFallback;
         json[JSON_SPIFFS_KEY_POOLURL] = Settings->PoolAddress;
         json[JSON_SPIFFS_KEY_POOLPORT] = Settings->PoolPort;
         json[JSON_SPIFFS_KEY_POOLPASS] = Settings->PoolPassword;
@@ -90,6 +94,14 @@ bool nvMemory::loadConfig(TSettings* Settings)
                 Serial.print('\n');
                 if (!error)
                 {
+                    if (json.containsKey(JSON_SPIFFS_KEY_WIFI_BSSID_LOCK))
+                        Settings->WifiBSSIDLock = json[JSON_SPIFFS_KEY_WIFI_BSSID_LOCK].as<bool>();
+                    if (json.containsKey(JSON_SPIFFS_KEY_WIFI_BSSID))
+                        Settings->WifiBSSID = json[JSON_SPIFFS_KEY_WIFI_BSSID].as<String>();
+                    if (json.containsKey(JSON_SPIFFS_KEY_WIFI_CHANNEL))
+                        Settings->WifiChannel = json[JSON_SPIFFS_KEY_WIFI_CHANNEL].as<int>();
+                    if (json.containsKey(JSON_SPIFFS_KEY_WIFI_FALLBACK))
+                        Settings->WifiFallback = json[JSON_SPIFFS_KEY_WIFI_FALLBACK].as<bool>();
                     Settings->PoolAddress = json[JSON_SPIFFS_KEY_POOLURL] | Settings->PoolAddress;
                     strcpy(Settings->PoolPassword, json[JSON_SPIFFS_KEY_POOLPASS] | Settings->PoolPassword);
                     strcpy(Settings->BtcWallet, json[JSON_SPIFFS_KEY_WALLETID] | Settings->BtcWallet);

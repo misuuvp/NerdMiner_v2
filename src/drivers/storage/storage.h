@@ -15,7 +15,7 @@
 #define DEFAULT_POOLURL		"public-pool.io"
 #define DEFAULT_POOLPASS	"x"
 #define DEFAULT_WALLETID	"yourBtcAddress"
-#define DEFAULT_POOLPORT	3333
+#define DEFAULT_POOLPORT	21496
 #define DEFAULT_TIMEZONE	2
 #define DEFAULT_SAVESTATS	false
 #define DEFAULT_INVERTCOLORS	false
@@ -45,12 +45,22 @@
 #define JSON_SPIFFS_KEY_STATS2NV	"saveStatsToNVS"
 #define JSON_SPIFFS_KEY_INVCOLOR	"invertColors"
 #define JSON_SPIFFS_KEY_BRIGHTNESS	"Brightness"
+#define JSON_SPIFFS_KEY_WIFI_BSSID_LOCK "wifiBssidLock"
+#define JSON_SPIFFS_KEY_WIFI_BSSID      "wifiBssid"
+#define JSON_SPIFFS_KEY_WIFI_CHANNEL    "wifiChannel"
+#define JSON_SPIFFS_KEY_WIFI_FALLBACK   "wifiFallback"
 
 // settings
 struct TSettings
 {
 	String WifiSSID{ DEFAULT_SSID };
 	String WifiPW{ DEFAULT_WIFIPW };
+
+	bool WifiBSSIDLock{ false };
+	String WifiBSSID{ "" };
+	int WifiChannel{ 0 };
+	bool WifiFallback{ true };
+
 	String PoolAddress{ DEFAULT_POOLURL };
 	char BtcWallet[80]{ DEFAULT_WALLETID };
 	char PoolPassword[80]{ DEFAULT_POOLPASS };

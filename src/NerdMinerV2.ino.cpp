@@ -60,7 +60,6 @@ const char* ntpServer = "pool.ntp.org";
 void setup()
 {
       //Init pin 15 to eneble 5V external power (LilyGo bug)
-      //Also used as power-hold latch on M5StickC Plus2 (GPIO4)
   #ifdef PIN_ENABLE5V
       pinMode(PIN_ENABLE5V, OUTPUT);
       digitalWrite(PIN_ENABLE5V, HIGH);
@@ -71,6 +70,10 @@ void setup()
 #else
     Serial.begin(115200);
 #endif //MONITOR_SPEED
+
+#if ARDUINO_USB_CDC_ON_BOOT
+    Serial.setTxTimeoutMs(0);
+#endif
 
   Serial.setTimeout(0);
   delay(SECOND_MS/10);

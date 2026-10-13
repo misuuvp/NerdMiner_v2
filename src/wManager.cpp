@@ -34,6 +34,271 @@ nvMemory nvMem;
 
 extern SDCard SDCrd;
 
+bool parseBSSID(const String& bssidString, uint8_t bssid[6])
+{
+    String value = bssidString;
+    value.trim();
+
+    unsigned int bytes[6];
+
+    if (sscanf(value.c_str(),
+               "%02x:%02x:%02x:%02x:%02x:%02x",
+               &bytes[0], &bytes[1], &bytes[2],
+               &bytes[3], &bytes[4], &bytes[5]) != 6)
+    {
+        return false;
+    }
+
+    for (int i = 0; i < 6; i++)
+    {
+        if (bytes[i] > 0xFF)
+            return false;
+
+        bssid[i] = static_cast<uint8_t>(bytes[i]);
+    }
+
+    return true;
+}
+
+bool saveWifiBSSIDConfig(const char* bssid, int channel, bool lock, bool fallback)
+{
+    if (bssid == nullptr)
+        return false;
+
+    String bssidString = String(bssid);
+    bssidString.trim();
+    bssidString.toUpperCase();
+
+    uint8_t parsedBSSID[6];
+
+    if (!parseBSSID(bssidString, parsedBSSID))
+    {
+        Serial.println("WiFi config: invalid BSSID");
+        return false;
+    }
+
+    if (channel < 1 || channel > 14)
+    {
+        Serial.println("WiFi config: invalid channel");
+        return false;
+    }
+
+    Settings.WifiBSSID = bssidString;
+    Settings.WifiChannel = channel;
+    Settings.WifiBSSIDLock = lock;
+    Settings.WifiFallback = fallback;
+
+    Serial.println("WiFi config: saving BSSID settings");
+    Serial.print("BSSID: ");
+    Serial.println(Settings.WifiBSSID);
+    Serial.print("Channel: ");
+    Serial.println(Settings.WifiChannel);
+    Serial.print("Lock: ");
+    Serial.println(Settings.WifiBSSIDLock ? "ON" : "OFF");
+    Serial.print("Fallback: ");
+    Serial.println(Settings.WifiFallback ? "ON" : "OFF");
+
+    return nvMem.saveConfig(&Settings);
+}
+
+bool savePoolConfig(const char* host,
+                    int port,
+                    const char* wallet,
+                    const char* password,
+                    bool changePassword)
+{
+    if (host == nullptr || wallet == nullptr)
+        return false;
+
+    String hostString = String(host);
+    hostString.trim();
+
+    String walletString = String(wallet);
+    walletString.trim();
+
+    if (hostString.length() == 0 || hostString.length() > 80)
+    {
+        Serial.println("Pool config: invalid host");
+        return false;
+    }
+
+    if (port < 1 || port > 65535)
+    {
+        Serial.println("Pool config: invalid port");
+        return false;
+    }
+
+    if (walletString.length() == 0 || walletString.length() >= sizeof(Settings.BtcWallet))
+    {
+        Serial.println("Pool config: invalid wallet/worker");
+        return false;
+    }
+
+    if (changePassword)
+    {
+        if (password == nullptr ||
+            strlen(password) >= sizeof(Settings.PoolPassword))
+        {
+            Serial.println("Pool config: invalid password");
+            return false;
+        }
+    }
+
+    Settings.PoolAddress = hostString;
+    Settings.PoolPort = port;
+
+    strncpy(Settings.BtcWallet,
+            walletString.c_str(),
+            sizeof(Settings.BtcWallet) - 1);
+
+    Settings.BtcWallet[sizeof(Settings.BtcWallet) - 1] = '\0';
+
+    if (changePassword)
+    {
+        strncpy(Settings.PoolPassword,
+                password,
+                sizeof(Settings.PoolPassword) - 1);
+
+        Settings.PoolPassword[sizeof(Settings.PoolPassword) - 1] = '\0';
+    }
+
+    Serial.println("Pool config: saving settings");
+    Serial.print("Host: ");
+    Serial.println(Settings.PoolAddress);
+    Serial.print("Port: ");
+    Serial.println(Settings.PoolPort);
+    Serial.print("Wallet/worker: ");
+    Serial.println(Settings.BtcWallet);
+    Serial.print("Password changed: ");
+    Serial.println(changePassword ? "YES" : "NO");
+
+    return nvMem.saveConfig(&Settings);
+}
+
+bool connectToSavedSSIDAnyBSSID()
+{
+    String savedSSID = wm.getWiFiSSID(true);
+    String savedPassword = wm.getWiFiPass(true);
+
+    if (savedSSID.length() == 0)
+    {
+        Serial.println("WiFi fallback: no saved SSID");
+        return false;
+    }
+
+    Serial.println("WiFi fallback: connecting without BSSID lock");
+    Serial.print("SSID: ");
+    Serial.println(savedSSID);
+
+    // Remove the currently active BSSID-specific STA configuration
+    // without erasing the saved SSID/password.
+    WiFi.disconnect(false, false);
+    delay(250);
+
+    // Scan all channels and prefer the strongest matching AP.
+    WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+    WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
+
+    // channel = 0 and BSSID = nullptr intentionally remove AP pinning.
+    WiFi.begin(
+        savedSSID.c_str(),
+        savedPassword.c_str(),
+        0,
+        nullptr,
+        true
+    );
+
+    unsigned long startTime = millis();
+
+    while (WiFi.status() != WL_CONNECTED &&
+           millis() - startTime < 15000)
+    {
+        delay(250);
+    }
+
+    if (WiFi.status() == WL_CONNECTED)
+    {
+        Serial.println("WiFi fallback: connected");
+        Serial.print("BSSID: ");
+        Serial.println(WiFi.BSSIDstr());
+        Serial.print("Channel: ");
+        Serial.println(WiFi.channel());
+        Serial.print("RSSI: ");
+        Serial.println(WiFi.RSSI());
+
+        return true;
+    }
+
+    Serial.println("WiFi fallback: connection failed");
+    return false;
+}
+bool connectToLockedBSSID()
+{
+    if (!Settings.WifiBSSIDLock)
+        return false;
+
+    if (Settings.WifiBSSID.length() == 0)
+        return false;
+
+    if (Settings.WifiChannel < 1 || Settings.WifiChannel > 14)
+    {
+        Serial.println("BSSID lock: invalid WiFi channel");
+        return false;
+    }
+
+    uint8_t bssid[6];
+
+    if (!parseBSSID(Settings.WifiBSSID, bssid))
+    {
+        Serial.println("BSSID lock: invalid BSSID");
+        return false;
+    }
+
+    String savedSSID = wm.getWiFiSSID(true);
+    String savedPassword = wm.getWiFiPass(true);
+
+    if (savedSSID.length() == 0)
+    {
+        Serial.println("BSSID lock: no saved WiFi SSID");
+        return false;
+    }
+
+    Serial.println("BSSID lock: connecting to selected AP");
+    Serial.print("SSID: ");
+    Serial.println(savedSSID);
+
+    Serial.print("BSSID: ");
+    Serial.println(Settings.WifiBSSID);
+
+    Serial.print("Channel: ");
+    Serial.println(Settings.WifiChannel);
+
+    WiFi.begin(
+        savedSSID.c_str(),
+        savedPassword.c_str(),
+        Settings.WifiChannel,
+        bssid,
+        true
+    );
+
+    unsigned long startTime = millis();
+
+    while (WiFi.status() != WL_CONNECTED &&
+           millis() - startTime < 15000)
+    {
+        delay(250);
+    }
+
+    if (WiFi.status() == WL_CONNECTED)
+    {
+        Serial.println("BSSID lock: connected");
+        return true;
+    }
+
+    Serial.println("BSSID lock: connection failed");
+    return false;
+}
+
 String readCustomAPName() {
     Serial.println("DEBUG: Attempting to read custom AP name from flash at 0x3F0000...");
     
@@ -128,6 +393,26 @@ void reset_configuration()
     ESP.restart();
 }
 
+void reset_wifi_configuration()
+{
+    Serial.println("Erasing WiFi configuration, restarting");
+
+    // Clear our BSSID-specific settings.
+    Settings.WifiBSSIDLock = false;
+    Settings.WifiBSSID = "";
+    Settings.WifiChannel = 0;
+    Settings.WifiFallback = true;
+
+    // Keep pool/wallet/etc., only update the Wi-Fi related extras.
+    nvMem.saveConfig(&Settings);
+
+    // Remove WiFiManager's stored SSID/password.
+    wm.resetSettings();
+
+    delay(250);
+    ESP.restart();
+}
+
 void init_WifiManager()
 {
 #ifdef MONITOR_SPEED
@@ -135,6 +420,9 @@ void init_WifiManager()
 #else
     Serial.begin(115200);
 #endif //MONITOR_SPEED
+#if ARDUINO_USB_CDC_ON_BOOT
+    Serial.setTxTimeoutMs(0);
+#endif
     //Serial.setTxTimeoutMs(10);
     
     // Check for custom AP name from flasher config, otherwise use default
@@ -149,6 +437,9 @@ void init_WifiManager()
 
     // Change to true when testing to force configuration every time we run
     bool forceConfig = false;
+
+    // True only when the device has no saved configuration yet.
+    bool freshConfig = false;
 
 #if defined(PIN_BUTTON_2)
     // Check if button2 is pressed to enter configMode with actual configuration
@@ -171,8 +462,9 @@ void init_WifiManager()
         }
         else
         {
-            //No config file on SD card. Starting wifi config server.
+            // No config file anywhere: first-time setup.
             forceConfig = true;
+            freshConfig = true;
         }
     };
     
@@ -204,11 +496,15 @@ void init_WifiManager()
     // Custom elements
 
     // Text box (String) - 80 characters maximum
-    WiFiManagerParameter pool_text_box("Poolurl", "Pool url", Settings.PoolAddress.c_str(), 80);
+    WiFiManagerParameter pool_text_box("Poolurl", "Pool url", freshConfig ? "" : Settings.PoolAddress.c_str(), 80);
 
     // Need to convert numerical input to string to display the default value.
     char convertedValue[6];
-    sprintf(convertedValue, "%d", Settings.PoolPort);
+
+    if (freshConfig)
+        convertedValue[0] = '\0';
+    else
+        sprintf(convertedValue, "%d", Settings.PoolPort);
 
     // Text box (Number) - 7 characters maximum
     WiFiManagerParameter port_text_box_num("Poolport", "Pool port", convertedValue, 7);
@@ -217,7 +513,7 @@ void init_WifiManager()
     //WiFiManagerParameter password_text_box("Poolpassword", "Pool password (Optional)", Settings.PoolPassword, 80);
 
     // Text box (String) - 80 characters maximum
-    WiFiManagerParameter addr_text_box("btcAddress", "Your BTC address", Settings.BtcWallet, 80);
+    WiFiManagerParameter addr_text_box("btcAddress", "Your BTC address", freshConfig ? "" : Settings.BtcWallet, 80);
 
   // Text box (Number) - 2 characters maximum
   char charZone[6];
@@ -233,12 +529,192 @@ void init_WifiManager()
   }
   WiFiManagerParameter save_stats_to_nvs("SaveStatsToNVS", "Save mining statistics to flash memory.", "T", 2, checkboxParams, WFM_LABEL_AFTER);
   // Text box (String) - 80 characters maximum
-  WiFiManagerParameter password_text_box("Poolpassword - Optional", "Pool password", Settings.PoolPassword, 80);
+  WiFiManagerParameter password_text_box("Poolpassword - Optional", "Pool password", freshConfig ? "" : Settings.PoolPassword, 80);
+  // WM_AP_SUPPORT_INTEGRATION_BEGIN
+  WiFiManagerParameter support_referral_html(R"WMHTML(
+<div id="wmSupportApNote"
+     style="display:none;
+            margin:12px 0 6px 0;
+            text-align:center;
+            font-size:12px;
+            opacity:0.65;">
+  <strong>Optional support</strong><br>
+  After saving you will be redirected to the pool affiliate page.<br>
+  If you check your miner there, you support Web Manager development
+  through the pool affiliate program.
+</div>
+
+<script>
+(function()
+{
+  function normalizeHost(value)
+  {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^stratum\+tcp:\/\//, '')
+      .replace(/^https?:\/\//, '')
+      .split('/')[0]
+      .split(':')[0]
+      .replace(/\.$/, '');
+  }
+
+  function supportUrl(value)
+  {
+    const host = normalizeHost(value);
+
+    const matches = (base) =>
+      host === base || host.endsWith('.' + base);
+
+    if (matches('xec.hmpool.io'))
+      return 'https://xec.hmpool.io?ref=HM-39uakb';
+
+    if (matches('digi.hmpool.io'))
+      return 'https://digi.hmpool.io?ref=HM-qg3swe';
+
+    if (matches('btc.hmpool.io'))
+      return 'https://hmpool.io?ref=HM-dk6cuv';
+
+    if (matches('bch.hmpool.io'))
+      return 'https://bch.hmpool.io?ref=HM-r6zdkz';
+
+    return '';
+  }
+
+  function install()
+  {
+    const pool = document.getElementById('Poolurl');
+
+    if (!pool || !pool.form)
+      return;
+
+    const form = pool.form;
+    const note = document.getElementById('wmSupportApNote');
+
+    const initialPool = normalizeHost(pool.value);
+
+    function currentSupportUrl()
+    {
+      const currentPool = normalizeHost(pool.value);
+
+      if (currentPool === initialPool)
+        return '';
+
+      return supportUrl(currentPool);
+    }
+
+    function updateNote()
+    {
+      if (!note)
+        return;
+
+      note.style.display =
+        currentSupportUrl() ? 'block' : 'none';
+    }
+
+    pool.addEventListener('input', updateNote);
+    pool.addEventListener('change', updateNote);
+
+    form.addEventListener('submit', function(event)
+    {
+      const url = currentSupportUrl();
+
+      /*
+       * Non-HMPool or unchanged pool:
+       * keep normal WiFiManager behaviour.
+       */
+      if (!url)
+        return;
+
+      event.preventDefault();
+
+      const formData = new FormData(form);
+      const encoded = new URLSearchParams();
+
+      formData.forEach(function(value, key)
+      {
+        encoded.append(key, value);
+      });
+
+      let action = form.getAttribute('action') || window.location.pathname;
+      const method = (form.method || 'POST').toUpperCase();
+
+      action = new URL(action, window.location.href).toString();
+
+      document.body.innerHTML =
+        '<div style="' +
+          'font-family:sans-serif;' +
+          'max-width:520px;' +
+          'margin:60px auto;' +
+          'padding:24px;' +
+          'text-align:center;' +
+        '">' +
+          '<h2>Settings saved</h2>' +
+          '<p>Support Web Manager development</p>' +
+          '<p>' +
+            'If you check your miner on the pool page that opens, ' +
+            'you support Web Manager development through the pool affiliate program.' +
+          '</p>' +
+          '<p><strong>This is optional.</strong></p>' +
+          '<p style="font-size:13px;opacity:.65">' +
+            'Waiting for Internet connection...' +
+          '</p>' +
+          '<p style="font-size:13px;opacity:.65">' +
+            'If the pool page does not open automatically, ' +
+            'refresh this page once your Internet connection is back.' +
+          '</p>' +
+        '</div>';
+
+      const options = {
+        method: method,
+        cache: 'no-store'
+      };
+
+      if (method === 'GET')
+      {
+        const separator = action.includes('?') ? '&' : '?';
+        action += separator + encoded.toString();
+      }
+      else
+      {
+        options.headers = {
+          'Content-Type':
+            'application/x-www-form-urlencoded;charset=UTF-8'
+        };
+
+        options.body = encoded.toString();
+      }
+
+      fetch(action, options).catch(function()
+      {
+        /*
+         * Expected when the ESP leaves AP mode or restarts.
+         */
+      });
+
+      setTimeout(function()
+      {
+        window.location.href = url;
+      }, 12000);
+    });
+
+    updateNote();
+  }
+
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', install);
+  else
+    install();
+})();
+</script>
+)WMHTML");
+  // WM_AP_SUPPORT_INTEGRATION_END
 
   // Add all defined parameters
   wm.addParameter(&pool_text_box);
   wm.addParameter(&port_text_box_num);
   wm.addParameter(&password_text_box);
+  wm.addParameter(&support_referral_html);
   wm.addParameter(&addr_text_box);
   wm.addParameter(&time_text_box_num);
   wm.addParameter(&features_html);
@@ -302,7 +778,68 @@ void init_WifiManager()
         wm.setConfigPortalBlocking(true);
         wm.setEnableConfigPortal(true);
         // if (!wm.autoConnect(Settings.WifiSSID.c_str(), Settings.WifiPW.c_str()))
-        if (!wm.autoConnect(apName, DEFAULT_WIFIPW))
+        bool wifiConnected = false;
+
+if (Settings.WifiBSSIDLock)
+{
+    wifiConnected = connectToLockedBSSID();
+
+    if (!wifiConnected)
+    {
+        WiFi.disconnect();
+        delay(250);
+
+        if (Settings.WifiFallback)
+        {
+            Serial.println("BSSID lock: selected AP unavailable");
+            Serial.println("BSSID lock: fallback to normal WiFiManager connection");
+
+            wifiConnected = connectToSavedSSIDAnyBSSID();
+
+            if (!wifiConnected)
+            {
+                Serial.println("WiFi fallback failed, starting WiFiManager recovery");
+                wifiConnected = wm.autoConnect(apName, DEFAULT_WIFIPW);
+            }
+        }
+        else
+        {
+            Serial.println("BSSID lock: selected AP unavailable");
+            Serial.println("BSSID lock: fallback disabled");
+            Serial.println("Starting configuration AP for recovery");
+
+            wifiConnected = wm.startConfigPortal(apName, DEFAULT_WIFIPW);
+
+            if (wifiConnected)
+            {
+                // A felhasználó kézzel új Wi-Fi kapcsolatot állított be.
+                // Kapcsoljuk ki a régi BSSID lockot, különben
+                // a következő újraindításkor ismét a régi AP-t keresné.
+                Settings.WifiBSSIDLock = false;
+                Settings.WifiBSSID = "";
+                Settings.WifiChannel = 0;
+                Settings.WifiFallback = true;
+
+                nvMem.saveConfig(&Settings);
+
+                Serial.println("BSSID lock cleared after manual WiFi recovery");
+            }
+        }
+    }
+}
+else
+{
+    // Always connect with BSSID unset so identical-SSID APs
+    // can be selected freely.
+    wifiConnected = connectToSavedSSIDAnyBSSID();
+
+    if (!wifiConnected)
+    {
+        wifiConnected = wm.autoConnect(apName, DEFAULT_WIFIPW);
+    }
+}
+
+if (!wifiConnected)
         {
             Serial.println("Failed to connect to configured WIFI, and hit timeout");
             if (shouldSaveConfig) {
