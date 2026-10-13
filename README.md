@@ -61,6 +61,21 @@ Features include:
 
 The Web Manager is especially useful for **headless ESP32-C3 SuperMini NerdMiner devices**, where configuration and monitoring would otherwise require serial access.
 
+
+### Web Manager screenshots
+
+#### Live mining statistics
+
+![NerdMiner v2 ESP32-C3 SuperMini Web Manager live mining statistics](images/webmanager/webmanager-status.png)
+
+#### Wi-Fi and BSSID management
+
+![NerdMiner v2 Web Manager Wi-Fi BSSID access point management](images/webmanager/webmanager-wifi.png)
+
+#### Pool and system configuration
+
+![NerdMiner v2 Web Manager pool wallet and ESP32 system configuration](images/webmanager/webmanager-config.png)
+
 ## Improved Wi-Fi and BSSID handling
 
 For networks with multiple access points using the same SSID, the firmware can:
@@ -175,6 +190,12 @@ Főbb funkciók:
 - mobilbarát kezelőfelület.
 
 Különösen hasznos kijelző nélküli, például **ESP32-C3 SuperMini alapú NerdMiner** esetén.
+
+### Magyar nyelvű változat
+
+Tervben van egy külön **magyar nyelvű firmware-változat** is, amelyben a Web Manager és a kezelőfelület főbb szövegei magyarul lesznek elérhetők.
+
+Az angol változat marad az alapértelmezett publikus verzió, a magyar kiadás pedig külön elérhető buildként készül.
 
 ## Továbbfejlesztett Wi-Fi / BSSID kezelés
 
