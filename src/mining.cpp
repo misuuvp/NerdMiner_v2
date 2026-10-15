@@ -786,14 +786,32 @@ void minerWorkerHw(void * task_id)
 
   while (1)
   {
+    // FX1-inspired backpressure: never silently discard a completed hash
+    // range (which could also contain a valid share). Do not sleep under
+    // s_job_mutex: the Stratum worker needs that mutex to drain the queue.
+    if (result)
+    {
+      bool delivered = false;
+      while (!delivered)
+      {
+        {
+          std::lock_guard<std::mutex> lock(s_job_mutex);
+          if (s_job_result_list.size() < 16)
+          {
+            s_job_result_list.push_back(result);
+            delivered = true;
+          }
+        }
+        if (!delivered)
+        {
+          esp_task_wdt_reset();
+          vTaskDelay(1);
+        }
+      }
+      result.reset();
+    }
     {
       std::lock_guard<std::mutex> lock(s_job_mutex);
-      if (result)
-      {
-        if (s_job_result_list.size() < 16)
-          s_job_result_list.push_back(result);
-        result.reset();
-      }
       if (!s_job_request_list_hw.empty())
       {
         job = s_job_request_list_hw.front();
@@ -829,9 +847,11 @@ void minerWorkerHw(void * task_id)
       REG_WRITE(&sha_text_regs[13], 0x00000000);
       REG_WRITE(&sha_text_regs[14], 0x00000000);
 
-      uint32_t nend = job->nonce_start + job->nonce_count;
-      for (uint32_t n = job->nonce_start; n < nend; ++n)
+      // Offset-based traversal correctly handles nonce wrap at UINT32_MAX.
+      // The previous end = start + count could wrap and skip the whole job.
+      for (uint32_t offset = 0; offset < job->nonce_count; ++offset)
       {
+        const uint32_t n = job->nonce_start + offset;
         //nerd_sha_hal_wait_idle();
         nerd_sha_ll_write_digest(digest_mid);
         //nerd_sha_hal_wait_idle();
@@ -844,6 +864,14 @@ void minerWorkerHw(void * task_id)
         nerd_sha_ll_fill_text_block_sha256_inter();
         //sha_ll_start_block(SHA2_256);
         REG_WRITE(SHA_START_REG, 1);
+#if defined(CONFIG_IDF_TARGET_ESP32C3) && defined(C3_SHA_SAFE_OVERLAP) && C3_SHA_SAFE_OVERLAP
+        // NMMiner-inspired *safe* overlap experiment: perform only CPU work
+        // while the second SHA runs. Keep the SHA_BUSY wait before reading
+        // or changing the hardware state; no firmware code is copied.
+        const bool job_changed_after_this_nonce =
+            ((n & 0xFFu) == 0u) &&
+            (s_working_current_job_id != job_in_work);
+#endif
         sha_ll_load(SHA2_256);
         nerd_sha_hal_wait_idle();
         if (nerd_sha_ll_read_digest_if(hash))
@@ -874,11 +902,13 @@ void minerWorkerHw(void * task_id)
             }
           }
         }
-        if (
-             (uint8_t)(n & 0xFF) == 0 &&
-             s_working_current_job_id != job_in_work)
+#if defined(CONFIG_IDF_TARGET_ESP32C3) && defined(C3_SHA_SAFE_OVERLAP) && C3_SHA_SAFE_OVERLAP
+        if (job_changed_after_this_nonce)
+#else
+        if (((n & 0xFFu) == 0u) && (s_working_current_job_id != job_in_work))
+#endif
         {
-          result->nonce_count = n-job->nonce_start+1;
+          result->nonce_count = offset + 1u;
           break;
         }
       }
